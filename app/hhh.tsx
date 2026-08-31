@@ -5,18 +5,6 @@ import Link from "next/link";
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Activity,
-  Bell,
-  Brain,
-  Check,
-  Download,
-  Eye,
-  FileText,
-  History,
-  Inbox,
-  Mail,
-  Settings2,
-  Wallet,
   Calendar,
   CheckCircle2,
   ChevronDown,
@@ -57,15 +45,6 @@ interface Transaction {
   amount: number;
   type: TransactionType;
   items: ReceiptItem[];
-  source?: "GMAIL" | "OUTLOOK" | "MANUAL";
-  sender?: string;
-  receivedAt?: string;
-  orderNumber?: string;
-  confidence?: number;
-  reviewed?: boolean;
-  recurring?: boolean;
-  archived?: boolean;
-  duplicateOf?: string;
 }
 
 interface Subcategory {
@@ -94,7 +73,6 @@ interface FlatItemEntry {
   date: string;
   txId: string;
   item: ReceiptItem;
-  tx: Transaction;
 }
 
 interface PendingRuleItem {
@@ -423,7 +401,6 @@ function useBudgetData() {
               date: tx.date,
               txId: tx.id,
               item,
-              tx,
             });
           });
         });
@@ -732,7 +709,6 @@ function TreeView({
   onItemCategoryChange,
   onAddItem,
   onDeleteItem,
-  onOpenTransaction,
 }: {
   parents: ParentCategory[];
   categories: CategoryOption[];
@@ -744,7 +720,6 @@ function TreeView({
   onItemCategoryChange: (itemId: string, itemDescription: string, categoryId: string) => void;
   onAddItem: (transactionId: string) => void;
   onDeleteItem: (transactionId: string, itemId: string) => void;
-  onOpenTransaction: (txId: string) => void;
 }) {
   if (parents.length === 0) {
     return (
@@ -801,7 +776,7 @@ function TreeView({
                             return (
                               <div key={tx.id} className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden">
                                 <button
-                                  onClick={() => { onToggleNode(tx.id); onOpenTransaction(tx.id); }}
+                                  onClick={() => onToggleNode(tx.id)}
                                   className="w-full p-3 bg-white flex items-center justify-between gap-2 hover:bg-purple-50/30 text-left"
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
@@ -1118,56 +1093,6 @@ function RuleToast({
 }
 
 /* ============================================================================
- * PREMIUM FRONTEND FEATURES
- * ==========================================================================*/
-function formatCompact(amount: number) {
-  if (Math.abs(amount) >= 1000000) return `₦${(amount / 1000000).toFixed(1)}M`;
-  if (Math.abs(amount) >= 1000) return `₦${(amount / 1000).toFixed(0)}K`;
-  return formatNaira(amount);
-}
-
-function ConfidenceBadge({ value }: { value?: number }) {
-  const confidence = value ?? 92;
-  return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-1 text-[10px] font-bold"><Brain className="w-3 h-3" /> {confidence}% confidence</span>;
-}
-
-function AnalyticsPanel({ flatItems, categories }: { flatItems: FlatItemEntry[]; categories: CategoryOption[] }) {
-  const debit = flatItems.filter(x => x.parentType === "DEBIT");
-  const byCategory = categories.map(cat => ({ name: cat.name, amount: debit.filter(x => x.item.categoryId === cat.id).reduce((s, x) => s + x.item.totalAmount, 0) })).filter(x => x.amount > 0).sort((a,b) => b.amount-a.amount).slice(0, 6);
-  const max = Math.max(...byCategory.map(x => x.amount), 1);
-  const merchantMap = new Map<string, number>();
-  debit.forEach(x => merchantMap.set(x.merchant, (merchantMap.get(x.merchant) || 0) + x.item.totalAmount));
-  const byMerchant = Array.from(merchantMap.entries()).map(([name, amount]) => ({name, amount})).sort((a,b)=>b.amount-a.amount).slice(0,5);
-  return <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-    <div className="xl:col-span-2 bg-white border border-purple-100 rounded-2xl p-4 sm:p-5 shadow-xs">
-      <div className="flex items-start justify-between gap-3 mb-5"><div><p className="text-[10px] uppercase tracking-wider font-bold text-purple-500">Spending intelligence</p><h2 className="text-base font-extrabold text-slate-900">Where your money is going</h2></div><span className="text-[10px] bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-slate-500">Live view</span></div>
-      <div className="space-y-4">{byCategory.length ? byCategory.map(item => <div key={item.name}><div className="flex justify-between text-xs mb-1.5"><span className="font-semibold text-slate-700 truncate pr-3">{item.name}</span><span className="font-mono font-bold">{formatCompact(item.amount)}</span></div><div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-purple-600 transition-all" style={{width:`${Math.max(5,item.amount/max*100)}%`}} /></div></div>) : <p className="text-xs text-slate-400 py-8 text-center">Not enough transaction data yet.</p>}</div>
-    </div>
-    <div className="bg-slate-950 text-white rounded-2xl p-4 sm:p-5 shadow-xs"><div className="flex items-center gap-2 mb-5"><Wallet className="w-4 h-4 text-purple-300"/><div><p className="text-[10px] uppercase tracking-wider font-bold text-purple-300">Top merchants</p><h2 className="text-sm font-extrabold">Largest spend sources</h2></div></div><div className="space-y-3">{byMerchant.length ? byMerchant.map((m,i)=><div key={m.name} className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-white/10 text-[10px] flex items-center justify-center font-bold">{i+1}</span><div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate">{m.name}</p><p className="text-[10px] text-slate-400">{debit.filter(x=>x.merchant===m.name).length} transaction(s)</p></div><span className="font-mono text-xs font-bold">{formatCompact(m.amount)}</span></div>) : <p className="text-xs text-slate-400">No merchant data.</p>}</div></div>
-  </section>;
-}
-
-function TransactionDrawer({ entry, categories, onClose, onCategoryChange, onReviewed, onRemember }: { entry: FlatItemEntry | null; categories: CategoryOption[]; onClose:()=>void; onCategoryChange:(itemId:string, categoryId:string)=>void; onReviewed:()=>void; onRemember:()=>void }) {
-  if (!entry) return null; const { item, tx } = entry;
-  return <div className="fixed inset-0 z-[70] bg-slate-950/35 backdrop-blur-[2px]" onMouseDown={onClose}><aside onMouseDown={e=>e.stopPropagation()} className="absolute right-0 top-0 h-full w-full sm:max-w-xl bg-white shadow-2xl overflow-y-auto">
-    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider font-bold text-purple-500">Transaction details</p><h2 className="text-lg font-extrabold truncate">{tx.merchant}</h2></div><button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5"/></button></div>
-    <div className="p-4 sm:p-6 space-y-5"><div className="rounded-2xl bg-gradient-to-br from-purple-950 to-slate-900 text-white p-5"><p className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">{tx.type === "DEBIT" ? "Expense" : "Income"}</p><p className="text-3xl font-extrabold font-mono mt-1">{formatNaira(item.totalAmount)}</p><div className="flex flex-wrap gap-2 mt-3"><span className="text-[10px] px-2 py-1 rounded-full bg-white/10">{tx.date}</span><span className="text-[10px] px-2 py-1 rounded-full bg-white/10">{tx.source || "MANUAL"}</span>{tx.reviewed ? <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-200">Reviewed</span> : <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/20 text-amber-200">Needs review</span>}</div></div>
-      <div className="grid grid-cols-2 gap-3"><div className="border border-slate-200 rounded-xl p-3"><p className="text-[10px] text-slate-400">Category</p><select value={item.categoryId} onChange={e=>onCategoryChange(item.id,e.target.value)} className="mt-1 w-full text-xs font-bold bg-transparent outline-none"><option value="">Uncategorized</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="border border-slate-200 rounded-xl p-3"><p className="text-[10px] text-slate-400">AI assessment</p><div className="mt-2"><ConfidenceBadge value={tx.confidence}/></div></div></div>
-      <div className="border border-slate-200 rounded-2xl overflow-hidden"><div className="px-4 py-3 border-b bg-slate-50 font-bold text-xs flex items-center gap-2"><FileText className="w-4 h-4 text-purple-600"/> Receipt line items</div><div className="divide-y">{tx.items.map(i=><div key={i.id} className="px-4 py-3 flex justify-between gap-3 text-xs"><div className="min-w-0"><p className="font-semibold truncate">{i.description}</p><p className="text-[10px] text-slate-400">{i.quantity} × {formatNaira(i.unitPrice)}</p></div><span className="font-mono font-bold">{formatNaira(i.totalAmount)}</span></div>)}</div></div>
-      <div className="border border-slate-200 rounded-2xl p-4 space-y-3"><p className="text-xs font-bold">Email information</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"><div><span className="text-slate-400 block">Subject</span><span className="font-medium break-words">{tx.rawEmailSubject}</span></div><div><span className="text-slate-400 block">Sender</span><span className="font-medium break-words">{tx.sender || "Not available yet"}</span></div><div><span className="text-slate-400 block">Received</span><span className="font-medium">{tx.receivedAt || tx.date}</span></div><div><span className="text-slate-400 block">Order number</span><span className="font-medium">{tx.orderNumber || "Not detected"}</span></div></div></div>
-      <div className="flex flex-wrap gap-2"><button onClick={onReviewed} className="inline-flex items-center gap-2 bg-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold"><Check className="w-4 h-4"/> Mark reviewed</button><button onClick={onRemember} className="inline-flex items-center gap-2 bg-purple-50 text-purple-800 border border-purple-100 px-4 py-2.5 rounded-xl text-xs font-bold"><Sparkles className="w-4 h-4"/> Remember choice</button><button className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700"><Eye className="w-4 h-4"/> View Email</button></div>
-    </div></aside></div>;
-}
-
-function AdvancedFilters({ open, onClose, source, setSource, reviewed, setReviewed, recurring, setRecurring, uncategorized, setUncategorized, maxAmount, setMaxAmount, fromDate, setFromDate, toDate, setToDate }: any) {
-  if (!open) return null; return <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-xs space-y-3"><div className="flex items-center justify-between"><h3 className="text-xs font-bold flex items-center gap-2"><Settings2 className="w-4 h-4 text-purple-600"/> Advanced filters</h3><button onClick={onClose} className="text-[10px] text-slate-500">Close</button></div><div className="grid grid-cols-2 md:grid-cols-4 gap-2"><input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="px-3 py-2 rounded-xl border text-xs"/><input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="px-3 py-2 rounded-xl border text-xs"/><input type="number" value={maxAmount} onChange={e=>setMaxAmount(e.target.value)} placeholder="Max amount" className="px-3 py-2 rounded-xl border text-xs"/><select value={source} onChange={e=>setSource(e.target.value)} className="px-3 py-2 rounded-xl border text-xs"><option value="ALL">All sources</option><option value="GMAIL">Gmail</option><option value="OUTLOOK">Outlook</option><option value="MANUAL">Manual</option></select></div><div className="flex flex-wrap gap-2"><button onClick={()=>setReviewed(reviewed === "true" ? "ALL" : "true")} className={`px-3 py-2 rounded-xl text-[10px] font-bold border ${reviewed === "true" ? "bg-purple-700 text-white" : "bg-white"}`}>Needs review</button><button onClick={()=>setRecurring(!recurring)} className={`px-3 py-2 rounded-xl text-[10px] font-bold border ${recurring ? "bg-purple-700 text-white" : "bg-white"}`}>Recurring only</button><button onClick={()=>setUncategorized(!uncategorized)} className={`px-3 py-2 rounded-xl text-[10px] font-bold border ${uncategorized ? "bg-purple-700 text-white" : "bg-white"}`}>Uncategorized only</button></div></div>;
-}
-
-function SyncSummaryCard() {
-  return <section className="bg-white border border-purple-100 rounded-2xl p-4 sm:p-5 shadow-xs"><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div className="flex items-start gap-3"><div className="p-2.5 rounded-xl bg-purple-50 text-purple-700"><Inbox className="w-5 h-5"/></div><div><p className="text-[10px] uppercase tracking-wider font-bold text-purple-500">Email intelligence</p><h2 className="font-extrabold text-sm sm:text-base">Keep your inbox and budget in sync</h2><p className="text-[11px] text-slate-500 mt-1">Connect Gmail or Outlook to scan receipts, detect transactions and keep your budget current.</p></div></div><Link href="/sync" className="inline-flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold"><Mail className="w-4 h-4"/> Open Sync Center</Link></div><div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4"><div className="bg-slate-50 rounded-xl p-3"><p className="text-[10px] text-slate-400">Status</p><p className="text-xs font-bold text-amber-600 mt-1">Ready to sync</p></div><div className="bg-slate-50 rounded-xl p-3"><p className="text-[10px] text-slate-400">Last synced</p><p className="text-xs font-bold mt-1">Not connected</p></div><div className="bg-slate-50 rounded-xl p-3"><p className="text-[10px] text-slate-400">Emails scanned</p><p className="text-xs font-bold mt-1">—</p></div><div className="bg-slate-50 rounded-xl p-3"><p className="text-[10px] text-slate-400">Receipts found</p><p className="text-xs font-bold mt-1">—</p></div><div className="bg-slate-50 rounded-xl p-3"><p className="text-[10px] text-slate-400">Failed emails</p><p className="text-xs font-bold mt-1">—</p></div></div></section>;
-}
-
-/* ============================================================================
  * PAGE
  * ==========================================================================*/
 
@@ -1205,22 +1130,6 @@ export default function BudgetDashboard() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [pendingRuleItem, setPendingRuleItem] = useState<PendingRuleItem | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<FlatItemEntry | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState("ALL");
-  const [reviewedFilter, setReviewedFilter] = useState("ALL");
-  const [recurringOnly, setRecurringOnly] = useState(false);
-  const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
-  const [maxAmount, setMaxAmount] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [page, setPage] = useState(1);
-  const [activity, setActivity] = useState<string[]>(["Budget workspace opened"]);
-  const [lastUndo, setLastUndo] = useState<null | (() => void)>(null);
-  const [showActivity, setShowActivity] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const PAGE_SIZE = 20;
 
   const toggleNode = (id: string) => setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -1236,10 +1145,7 @@ export default function BudgetDashboard() {
   };
 
   const handleItemCategoryChange = async (itemId: string, itemDescription: string, categoryId: string) => {
-    const previous = allFlatItems.find(x => x.item.id === itemId)?.item.categoryId || "";
     await changeItemCategory(itemId, categoryId);
-    setLastUndo(() => () => { void changeItemCategory(itemId, previous); });
-    setActivity(prev => [`Category updated: ${itemDescription}`, ...prev].slice(0,20));
     const targetCat = categories.find((c) => c.id === categoryId);
     showToast(`Updated "${itemDescription}" category.`);
     setPendingRuleItem({ id: itemId, name: itemDescription, categoryId, categoryName: targetCat?.name || "" });
@@ -1271,10 +1177,7 @@ export default function BudgetDashboard() {
 
   const handleApplyBulkCategory = async () => {
     if (!bulkCategoryId || selectedItemIds.length === 0) return;
-    const previous = selectedItemIds.map(id => ({id, categoryId: allFlatItems.find(x=>x.item.id===id)?.item.categoryId || ""}));
     await bulkChangeCategory(selectedItemIds, bulkCategoryId);
-    setLastUndo(() => () => { previous.forEach(x => void changeItemCategory(x.id, x.categoryId)); });
-    setActivity(prev => [`Bulk categorized ${selectedItemIds.length} items`, ...prev].slice(0,20));
     showToast(`Updated ${selectedItemIds.length} items.`);
     setSelectedItemIds([]);
     setBulkCategoryId("");
@@ -1287,30 +1190,16 @@ export default function BudgetDashboard() {
     setPendingRuleItem(null);
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus(); }
-      if (e.key === "Escape") { setSelectedEntry(null); setShowActivity(false); setShowNotifications(false); }
-    };
-    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => { setPage(1); }, [activeTab, searchQuery, selectedCategoryFilter, sourceFilter, reviewedFilter, recurringOnly, uncategorizedOnly, maxAmount, fromDate, toDate, sortBy]);
-
   const filteredFlatItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    const result = allFlatItems.filter((entry) => {
-      const haystack = `${entry.item.description} ${entry.merchant} ${entry.tx.rawEmailSubject} ${entry.tx.sender || ""}`.toLowerCase();
-      const matchesReviewed = reviewedFilter === "ALL" || (reviewedFilter === "true" ? entry.tx.reviewed !== true : entry.tx.reviewed === true);
-      return entry.parentType === activeTab && (!q || haystack.includes(q)) && (selectedCategoryFilter === "ALL" || entry.item.categoryId === selectedCategoryFilter) && (sourceFilter === "ALL" || (entry.tx.source || "MANUAL") === sourceFilter) && matchesReviewed && (!recurringOnly || entry.tx.recurring === true) && (!uncategorizedOnly || !entry.item.categoryId) && (!maxAmount || entry.item.totalAmount <= Number(maxAmount)) && (!fromDate || entry.date >= fromDate) && (!toDate || entry.date <= toDate);
+    return allFlatItems.filter((entry) => {
+      const matchesType = entry.parentType === activeTab;
+      const matchesSearch =
+        entry.item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        entry.merchant.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCat = selectedCategoryFilter === "ALL" || entry.item.categoryId === selectedCategoryFilter;
+      return matchesType && matchesSearch && matchesCat;
     });
-    return result.sort((a,b) => sortBy === "highest" ? b.item.totalAmount-a.item.totalAmount : sortBy === "lowest" ? a.item.totalAmount-b.item.totalAmount : sortBy === "oldest" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
-  }, [allFlatItems, activeTab, searchQuery, selectedCategoryFilter, sourceFilter, reviewedFilter, recurringOnly, uncategorizedOnly, maxAmount, fromDate, toDate, sortBy]);
-  const pageCount = Math.max(1, Math.ceil(filteredFlatItems.length / PAGE_SIZE));
-  const pagedItems = useMemo(() => filteredFlatItems.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE), [filteredFlatItems, page]);
-  const needsReview = allFlatItems.filter(x => x.tx.reviewed !== true).length;
-  const recurringCount = allFlatItems.filter(x => x.tx.recurring === true).length;
-  const topCategory = useMemo(() => categories.map(c => ({...c,total:allFlatItems.filter(x=>x.parentType === "DEBIT" && x.item.categoryId===c.id).reduce((s,x)=>s+x.item.totalAmount,0)})).sort((a,b)=>b.total-a.total)[0], [categories, allFlatItems]);
+  }, [allFlatItems, activeTab, searchQuery, selectedCategoryFilter]);
 
   const treeParents = useMemo(() => data.filter((parent) => parent.type === activeTab), [data, activeTab]);
 
@@ -1342,9 +1231,6 @@ export default function BudgetDashboard() {
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-6 space-y-6">
         <StatCards totalDebit={totals.debit} totalCredit={totals.credit} netBalance={totals.net} />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3"><div className="bg-white border border-purple-100 rounded-2xl p-4"><p className="text-[10px] uppercase font-bold text-slate-400">Needs review</p><p className="text-2xl font-extrabold mt-1">{needsReview}</p></div><div className="bg-white border border-purple-100 rounded-2xl p-4"><p className="text-[10px] uppercase font-bold text-slate-400">Recurring</p><p className="text-2xl font-extrabold mt-1">{recurringCount}</p></div><div className="bg-white border border-purple-100 rounded-2xl p-4"><p className="text-[10px] uppercase font-bold text-slate-400">Top category</p><p className="text-sm font-extrabold mt-2 truncate">{topCategory?.name || "—"}</p><p className="text-[10px] text-slate-500 mt-1">{topCategory ? formatCompact(topCategory.total) : "No data"}</p></div><div className="bg-white border border-purple-100 rounded-2xl p-4"><p className="text-[10px] uppercase font-bold text-slate-400">Results</p><p className="text-2xl font-extrabold mt-1">{filteredFlatItems.length}</p></div></div>
-        <SyncSummaryCard />
-        <AnalyticsPanel flatItems={allFlatItems} categories={categories} />
 
         <ControlBar
           activeTab={activeTab}
@@ -1362,9 +1248,6 @@ export default function BudgetDashboard() {
           onBulkCategoryChange={setBulkCategoryId}
           onApplyBulkCategory={handleApplyBulkCategory}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex gap-2"><button onClick={()=>setShowAdvanced(!showAdvanced)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold ${showAdvanced?"bg-purple-700 text-white":"bg-white text-slate-700"}`}><SlidersHorizontal className="w-3.5 h-3.5"/> Filters</button><button onClick={()=>setShowActivity(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-purple-100 text-xs font-bold"><History className="w-3.5 h-3.5"/> Activity</button><button onClick={()=>setShowNotifications(!showNotifications)} className="relative inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-purple-100 text-xs font-bold"><Bell className="w-3.5 h-3.5"/> Notifications{needsReview>0&&<span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center">{Math.min(needsReview,9)}</span>}</button></div><div className="flex gap-2"><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-2 bg-white border border-purple-100 rounded-xl text-xs font-semibold"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="highest">Highest amount</option><option value="lowest">Lowest amount</option></select><button onClick={()=>{const csv=["Date,Merchant,Item,Amount,Type,Category,Source,Reviewed",...filteredFlatItems.map(x=>[x.date,x.merchant,x.item.description,x.item.totalAmount,x.parentType,categories.find(c=>c.id===x.item.categoryId)?.name||"Uncategorized",x.tx.source||"MANUAL",x.tx.reviewed?"Yes":"No"].map(v=>`"${String(v).replaceAll('"','""')}"`).join(","))];const blob=new Blob([csv.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="fawaz-transactions.csv";a.click();URL.revokeObjectURL(a.href);showToast("CSV exported");}} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-700 text-white text-xs font-bold"><Download className="w-3.5 h-3.5"/> Export</button></div></div>
-        <AdvancedFilters open={showAdvanced} onClose={()=>setShowAdvanced(false)} source={sourceFilter} setSource={setSourceFilter} reviewed={reviewedFilter} setReviewed={setReviewedFilter} recurring={recurringOnly} setRecurring={setRecurringOnly} uncategorized={uncategorizedOnly} setUncategorized={setUncategorizedOnly} maxAmount={maxAmount} setMaxAmount={setMaxAmount} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} />
-        {showNotifications && <div className="fixed top-20 right-3 z-50 w-[min(360px,calc(100vw-24px))] bg-white border border-purple-100 rounded-2xl shadow-2xl p-4"><div className="flex justify-between mb-3"><h3 className="text-xs font-extrabold">Notifications</h3><button onClick={()=>setShowNotifications(false)}><X className="w-4 h-4"/></button></div><div className="space-y-2 text-xs"><div className="p-3 bg-amber-50 rounded-xl"><b>{needsReview}</b> transactions need review.</div><div className="p-3 bg-purple-50 rounded-xl">Email sync is ready to be connected.</div></div></div>}
 
         {viewMode === "tree" && (
           <TreeView
@@ -1378,19 +1261,14 @@ export default function BudgetDashboard() {
             onItemCategoryChange={handleItemCategoryChange}
             onAddItem={handleAddItem}
             onDeleteItem={handleDeleteItem}
-            onOpenTransaction={(txId) => { const found = allFlatItems.find(x => x.txId === txId); if (found) setSelectedEntry(found); }}
           />
         )}
 
-        {viewMode === "kanban" && <KanbanView categories={categories} flatItems={pagedItems} />}
+        {viewMode === "kanban" && <KanbanView categories={categories} flatItems={filteredFlatItems} />}
 
-        {viewMode === "calendar" && <CalendarView flatItems={pagedItems} categories={categories} />}
-        <div className="flex items-center justify-between bg-white border border-purple-100 rounded-2xl px-4 py-3"><p className="text-[10px] text-slate-500">Showing {filteredFlatItems.length ? (page-1)*PAGE_SIZE+1 : 0}–{Math.min(page*PAGE_SIZE,filteredFlatItems.length)} of {filteredFlatItems.length}</p><div className="flex items-center gap-2"><button disabled={page===1} onClick={()=>setPage(p=>Math.max(1,p-1))} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Previous</button><span className="text-xs font-bold">{page} / {pageCount}</span><button disabled={page===pageCount} onClick={()=>setPage(p=>Math.min(pageCount,p+1))} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Next</button></div></div>
+        {viewMode === "calendar" && <CalendarView flatItems={filteredFlatItems} categories={categories} />}
       </main>
 
-      {lastUndo && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[65] bg-slate-950 text-white rounded-xl px-3 py-2 flex items-center gap-3 shadow-2xl"><span className="text-[11px]">Change saved</span><button onClick={()=>{lastUndo();setLastUndo(null);showToast("Change undone");}} className="text-[11px] font-bold text-purple-300">Undo</button></div>}
-      {showActivity && <div className="fixed inset-0 z-[60] bg-slate-950/30" onClick={()=>setShowActivity(false)}><aside onClick={e=>e.stopPropagation()} className="absolute right-0 top-0 h-full w-full sm:max-w-sm bg-white shadow-2xl p-5"><div className="flex justify-between mb-5"><h3 className="font-extrabold text-sm">Activity history</h3><button onClick={()=>setShowActivity(false)}><X className="w-4 h-4"/></button></div><div className="space-y-3">{activity.map((a,i)=><div key={i} className="text-xs p-3 rounded-xl bg-slate-50"><p className="font-semibold">{a}</p><p className="text-[10px] text-slate-400 mt-1">Just now</p></div>)}</div></aside></div>}
-      <TransactionDrawer entry={selectedEntry} categories={categories} onClose={()=>setSelectedEntry(null)} onCategoryChange={async (itemId,categoryId)=>{const f=allFlatItems.find(x=>x.item.id===itemId);await handleItemCategoryChange(itemId,f?.item.description||"Item",categoryId);setSelectedEntry(null);}} onReviewed={()=>{setActivity(p=>["Transaction marked as reviewed",...p].slice(0,20));showToast("Transaction marked reviewed");setSelectedEntry(null);}} onRemember={()=>{if(selectedEntry){setPendingRuleItem({id:selectedEntry.item.id,name:selectedEntry.item.description,categoryId:selectedEntry.item.categoryId,categoryName:categories.find(c=>c.id===selectedEntry.item.categoryId)?.name||"Uncategorized"});setSelectedEntry(null);}}} />
       <CategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
@@ -1402,7 +1280,6 @@ export default function BudgetDashboard() {
       />
 
       <RuleToast pendingRuleItem={pendingRuleItem} onSave={handleSaveRule} onDismiss={() => setPendingRuleItem(null)} />
-      <nav className="fixed md:hidden bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-2 py-2 flex justify-around shadow-2xl"><button onClick={()=>window.scrollTo({top:0,behavior:"smooth"})} className="flex flex-col items-center gap-1 px-4 py-1.5 text-slate-600"><Wallet className="w-4 h-4"/><span className="text-[9px] font-bold">Home</span></button><button onClick={()=>document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus()} className="flex flex-col items-center gap-1 px-4 py-1.5 text-slate-600"><Search className="w-4 h-4"/><span className="text-[9px] font-bold">Search</span></button><Link href="/sync" className="flex flex-col items-center gap-1 px-4 py-1.5 text-slate-600"><RefreshCw className="w-4 h-4"/><span className="text-[9px] font-bold">Sync</span></Link><button onClick={()=>setShowActivity(true)} className="flex flex-col items-center gap-1 px-4 py-1.5 text-slate-600"><History className="w-4 h-4"/><span className="text-[9px] font-bold">Activity</span></button></nav>
     </div>
   );
 }
