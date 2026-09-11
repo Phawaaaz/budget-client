@@ -58,5 +58,12 @@ export const sampleData: FinanceData = {
 export function isFinanceData(value: unknown): value is FinanceData {
   if (!value || typeof value !== "object") return false;
   const d = value as FinanceData;
-  return d.version === 1 && Array.isArray(d.accounts) && d.accounts.length > 0 && d.accounts.every(a => typeof a.id === "string" && typeof a.name === "string" && Number.isFinite(a.openingBalance)) && Array.isArray(d.transactions) && d.transactions.every(t => typeof t.id === "string" && typeof t.merchant === "string" && typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount > 0 && ["in", "out"].includes(t.type) && categories.includes(t.category) && d.accounts.some(a => a.id === t.accountId)) && Array.isArray(d.budgets) && d.budgets.every(b => typeof b.id === "string" && categories.includes(b.category) && Number.isFinite(b.limit) && b.limit > 0 && /^\d{4}-\d{2}$/.test(b.month));
+  return d.version === 1
+    && Array.isArray(d.accounts) && d.accounts.length > 0
+    && d.accounts.every(a => a && typeof a.id === "string" && typeof a.name === "string" && typeof a.kind === "string" && typeof a.color === "string" && Number.isFinite(a.openingBalance))
+    && Array.isArray(d.transactions)
+    && d.transactions.every(t => t && typeof t.id === "string" && typeof t.merchant === "string" && typeof t.note === "string" && typeof t.reviewed === "boolean" && ["Sample email", "Manual"].includes(t.source) && typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount > 0 && ["in", "out"].includes(t.type) && categories.includes(t.category) && d.accounts.some(a => a.id === t.accountId))
+    && Array.isArray(d.budgets)
+    && d.budgets.every(b => b && typeof b.id === "string" && categories.includes(b.category) && b.category !== "Income" && Number.isFinite(b.limit) && b.limit > 0 && /^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))
+    && new Set(d.budgets.map(b => `${b.month}:${b.category}`)).size === d.budgets.length;
 }
