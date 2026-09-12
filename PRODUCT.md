@@ -24,11 +24,10 @@ The product name will change. A replacement name has not been chosen. Neither th
 
 ## Evidence on Hand
 
-- `app/page.tsx` contains a prototype transaction dashboard with mock records, categorization, filters, review controls, and CSV export.
-- `app/sync/page.tsx` simulates email receipt parsing. It is prototype evidence, not proof of a working email connection.
+- `app/components/money-workspace.tsx` contains the frontend dashboard, categorization, filters, review controls, budgets, and CSV export.
+- `app/lib/finance.ts` contains labeled sample records and shared financial calculations.
+- `app/sync/page.tsx` opens the inbox view with an explicit disconnected state. Email parsing is not implemented.
 - Existing examples use Nigerian naira. This does not establish a confirmed currency or regional constraint.
-
-## Open Decisions
 
 ## Frontend Scope
 

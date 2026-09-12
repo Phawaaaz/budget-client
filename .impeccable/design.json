@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-07T13:50:59.992Z",
+  "title": "Design System: Folio (Working Name)",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Graphite"
+      },
+      "yellow": {
+        "role": "primary",
+        "displayName": "Planner Yellow"
+      },
+      "green": {
+        "role": "secondary",
+        "displayName": "Income Green"
+      },
+      "coral": {
+        "role": "secondary",
+        "displayName": "Expense Coral"
+      },
+      "mint": {
+        "role": "tertiary",
+        "displayName": "Budget Mint"
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Near-White Canvas"
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White Surface"
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Pale Sidebar"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Text"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divider"
+      },
+      "positive": {
+        "role": "semantic",
+        "displayName": "Positive Text"
+      },
+      "negative": {
+        "role": "semantic",
+        "displayName": "Negative Text"
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Primary Hover"
+      },
+      "chip": {
+        "role": "neutral",
+        "displayName": "Chip Surface"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Balance",
+        "purpose": "Base desktop balance; tabular numerals. Responsive sizes are documented in DESIGN.md."
+      },
+      "headline": {
+        "displayName": "Page Heading",
+        "purpose": "Compact page introduction."
+      },
+      "title": {
+        "displayName": "Section Title",
+        "purpose": "Financial section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Inherited base; most metadata uses smaller explicit sizes."
+      },
+      "label": {
+        "displayName": "Action Label",
+        "purpose": "Shared button typography."
+      }
+    },
+    "shadows": [
+      {
+        "name": "selected-segment",
+        "value": "0 1px 3px #24282012",
+        "purpose": "Selected ledger filter."
+      },
+      {
+        "name": "dialog",
+        "value": "0 18px 70px #171f2940",
+        "purpose": "Native modal overlay."
+      },
+      {
+        "name": "toast",
+        "value": "0 8px 25px #24282020",
+        "purpose": "Temporary status notification."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": "background-color .16s, color .16s, border-color .16s",
+        "purpose": "Buttons, links, inputs, and selects."
+      },
+      {
+        "name": "bar-reveal",
+        "value": ".65s cubic-bezier(.16,1,.3,1) both",
+        "purpose": "Clip-path reveal from inset(0 100% 0 0) to inset(0 0 0 0)."
+      },
+      {
+        "name": "category-hover",
+        "value": "transform .15s",
+        "purpose": "Spending segment translates upward by 3px."
+      },
+      {
+        "name": "budget-progress",
+        "value": "width .3s",
+        "purpose": "Budget progress width updates."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation:none!important;transition:none!important;scroll-behavior:auto!important",
+        "purpose": "Applied globally under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-min",
+        "value": "1500px"
+      },
+      {
+        "name": "compact-max",
+        "value": "1200px"
+      },
+      {
+        "name": "rail-max",
+        "value": "950px"
+      },
+      {
+        "name": "stacked-max",
+        "value": "720px"
+      },
+      {
+        "name": "phone-max",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Observed action variant; disabled opacity and global focus treatment preserved.",
+      "html": "<button class=\"ds-button-primary\">Add transaction</button>",
+      "css": ".ds-button-primary{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d6dccd;border-radius:5px;padding:10px 15px;font-size:12px;font-weight:550;min-height:39px;white-space:nowrap;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s;background:var(--ink,#242820);color:white;border-color:var(--ink,#242820);}.ds-button-primary:hover{filter:brightness(.98)}.ds-button-primary:hover{background:#424a36}.ds-button-primary:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}.ds-button-primary:disabled{opacity:.45;cursor:not-allowed}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Observed action variant; disabled opacity and global focus treatment preserved.",
+      "html": "<button class=\"ds-button-secondary\">Clear filters</button>",
+      "css": ".ds-button-secondary{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d6dccd;border-radius:5px;padding:10px 15px;font-size:12px;font-weight:550;min-height:39px;white-space:nowrap;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s;background:var(--background,#fafbf8);color:var(--ink,#242820);}.ds-button-secondary:hover{filter:brightness(.98)}.ds-button-secondary:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}.ds-button-secondary:disabled{opacity:.45;cursor:not-allowed}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Observed action variant; disabled opacity and global focus treatment preserved.",
+      "html": "<button class=\"ds-button-danger\">Delete</button>",
+      "css": ".ds-button-danger{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d6dccd;border-radius:5px;padding:10px 15px;font-size:12px;font-weight:550;min-height:39px;white-space:nowrap;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s;background:transparent;color:#ad4130;border-color:#e2c7c0;}.ds-button-danger:hover{filter:brightness(.98)}.ds-button-danger:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}.ds-button-danger:disabled{opacity:.45;cursor:not-allowed}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Dialog Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Observed labeled amount field with native validation.",
+      "html": "<label class=\"ds-field\">Amount (NGN)<input type=\"number\" min=\"0.01\" step=\"0.01\" placeholder=\"0.00\" required /></label>",
+      "css": ".ds-field{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:block;color:var(--ink,#242820);font-size:12px;font-weight:500}.ds-field input{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:block;width:100%;min-width:0;box-sizing:border-box;padding:12px;border:1px solid #d4dbcb;border-radius:5px;background:#fff;color:inherit;margin-top:8px;font-size:13px;min-height:43px;transition:background-color .16s,color .16s,border-color .16s}.ds-field input:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Selected Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "The selected desktop navigation state.",
+      "html": "<nav aria-label=\"Preview navigation\"><button class=\"ds-nav\" aria-current=\"page\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg><span>Overview</span></button></nav>",
+      "css": ".ds-nav{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;width:100%;display:flex;gap:13px;align-items:center;padding:13px 15px;color:#fff;background:var(--ink,#242820);border:0;border-radius:5px;text-align:left;margin-bottom:5px;font-size:13px;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s}.ds-nav:hover{filter:brightness(.98)}.ds-nav:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Account Chip",
+      "kind": "chip",
+      "refersTo": "account-chip",
+      "description": "Compact account shortcut; the actual dot color comes from account data.",
+      "html": "<button class=\"ds-chip\"><i></i>All accounts<svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-chip{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;font-size:10px;display:flex;gap:5px;align-items:center;background:#eef1e8;color:var(--ink,#242820);padding:6px 7px;border:0;border-radius:3px;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s}.ds-chip i{width:6px;height:6px;border-radius:50%;background:var(--green,#358760)}.ds-chip:hover{filter:brightness(.98)}.ds-chip:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Budget Card",
+      "kind": "card",
+      "refersTo": "budget-card",
+      "description": "White repeated budget container; preview uses illustrative amounts.",
+      "html": "<article class=\"ds-card\"><h2>Shopping</h2><div><strong>25,000</strong><span> / 50,000</span></div><div class=\"ds-progress\" role=\"progressbar\" aria-label=\"Budget used\" aria-valuenow=\"50\" aria-valuemin=\"0\" aria-valuemax=\"100\"><span></span></div><p>On track</p></article>",
+      "css": ".ds-card{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;border:1px solid var(--line,#e1e5db);background:#fff;color:var(--ink,#242820);border-radius:8px;padding:22px}.ds-card h2{font-size:16px;margin:18px 0 15px}.ds-card strong{font-size:23px;font-weight:550}.ds-card div>span,.ds-card p{font-size:10px;color:var(--muted,#686e63)}.ds-progress{height:8px;background:#eef0e9;border-radius:3px;margin:21px 0 13px;overflow:hidden}.ds-progress span{display:block;height:100%;width:50%;border-radius:3px;background:var(--coral,#ed896f);transition:width .3s}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    },
+    {
+      "name": "Mint Budget Summary",
+      "kind": "custom",
+      "refersTo": "budget-snapshot",
+      "description": "Signature summary with 30 ticks; preview uses illustrative 50% usage.",
+      "html": "<section class=\"ds-summary\"><h2>A plan you can live with.</h2><p>50% of your monthly budget used</p><div class=\"ds-ticks\" aria-label=\"50 percent used\"><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i class=\"ds-filled\"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class=\"ds-remaining\"><strong>50,000</strong><span>left to spend</span></div><button>Check your budgets<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button></section>",
+      "css": ".ds-summary{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;background:var(--mint,#d7f1ba);color:var(--ink,#242820);padding:23px 24px 18px;border-radius:6px}.ds-summary h2{font-size:23px;font-weight:550;max-width:200px;line-height:1.2;margin:0}.ds-summary p{font-size:10px;margin:12px 0 0;color:#4b6240}.ds-ticks{display:flex;gap:4px;height:50px;margin:30px 0 17px}.ds-ticks i{flex:1;min-width:0;background:#b9d99d;border-radius:2px}.ds-ticks .ds-filled{background:#365d32}.ds-remaining{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.ds-remaining strong{font-size:27px;font-weight:550}.ds-remaining span{font-size:10px;color:#4b6240}.ds-summary button{font-family:var(--font-geist-sans,Arial),sans-serif;letter-spacing:0;display:flex;width:100%;align-items:center;justify-content:space-between;border:0;border-top:1px solid #b3d69a;background:none;color:inherit;padding:17px 0 0;margin-top:25px;font-size:11px;font-weight:550;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s}.ds-summary button:hover{filter:brightness(.98)}.ds-summary button:focus-visible{outline:2px solid var(--green,#358760);outline-offset:4px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "An expressive monthly personal finance planner",
+    "overview": "Graphite text and white surfaces give the financial records a clear, compact structure. A yellow sidebar planner, green income, coral expenses, and mint budget summary make monthly planning expressive and tangible.\n\nFolio is a working name only. This document records the current implementation in `app/globals.css` and `app/components/money-workspace.tsx`, with font loading confirmed in `app/layout.tsx`. The interface addresses Fawaz and displays sample NGN data. Changes persist locally in the browser; bank and email connections are not implemented. This is source inspection, not a rendered accessibility or visual certification.",
+    "keyCharacteristics": [
+      "Compact financial records with prominent balances.",
+      "Graphite and white structure with yellow, green, coral, and mint accents.",
+      "Unframed overview sections separated by fine rules.",
+      "Planner bars, daily cash flow, category strips, and budget ticks.",
+      "Crisp controls, Lucide icons, and modest corner radii."
+    ],
+    "rules": [
+      {
+        "name": "The Cash Flow Rule",
+        "body": "Keep green for money in and coral for money out in the cash-flow graphics; retain labels and direction icons alongside color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numeric Hierarchy Rule",
+        "body": "Give balances greater visual weight than metadata, and retain tabular numerals on the balance, cash-flow amounts, and transaction amounts.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workspace Rule",
+        "body": "Keep overview sections unframed and use shadows only where the implementation already signals selection or an overlay.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the graphite/white foundation and the yellow planner, green income, coral expense, and mint summary roles.",
+      "Do keep financial labels, direction icons, and status text alongside color.",
+      "Do use open overview sections and compact repeated cards for budgets and accounts.",
+      "Do retain sample-data labeling and identify Folio as a working name."
+    ],
+    "donts": [
+      "Don't imply bank or email integration, or remote persistence, is already implemented.",
+      "Don't replace the observed breakpoint behavior with fluid typography.",
+      "Don't treat loaded Geist Mono as the current financial display font.",
+      "Don't describe balance masking as hiding the shapes or proportions of the charts."
+    ]
+  }
+}
