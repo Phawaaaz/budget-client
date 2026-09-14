@@ -1,0 +1,51 @@
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const assert = require('node:assert/strict');
+
+(async () => {
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('http://localhost:3010', { timeout: 120000 });
+    await page.getByRole('button', { name: 'Add transaction', exact: true }).waitFor();
+    await page.screenshot({ path: '.impeccable/desktop.png', fullPage: true });
+    await page.getByRole('button', { name: 'Budgets', exact: true }).click();
+    await page.getByRole('button', { name: 'Create budget', exact: true }).click();
+    await page.getByRole('dialog').locator('select[name="category"]').selectOption('Other');
+    await page.getByLabel('Monthly limit (NGN)').fill('25000');
+    await page.getByRole('dialog').getByRole('button', { name: 'Create budget', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Other budget' }).waitFor();
+    await page.reload();
+    await page.getByRole('button', { name: 'Budgets', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Other budget' }).click();
+    assert.equal(await page.getByLabel('Monthly limit (NGN)').inputValue(), '25000');
+    await page.getByLabel('Monthly limit (NGN)').fill('30000');
+    await page.getByRole('button', { name: 'Save budget', exact: true }).click();
+    await page.screenshot({ path: '.impeccable/budgets.png', fullPage: true });
+    await page.getByRole('button', { name: 'Transactions', exact: true }).click();
+    await page.getByRole('button', { name: 'Add transaction', exact: true }).click();
+    await page.getByLabel('Amount (NGN)', { exact: true }).fill('1234');
+    await page.getByLabel('Name', { exact: true }).fill('Frontend verification');
+    await page.getByRole('dialog').getByRole('button', { name: 'Add transaction', exact: true }).click();
+    await page.getByLabel('Search transactions').fill('Frontend verification');
+    await page.locator('.transaction-row').filter({ hasText: 'Frontend verification' }).waitFor();
+    assert.equal(await page.locator('.transaction-row').count(), 1);
+    await page.getByLabel('Search transactions').fill('no-matching-record');
+    await page.getByText('No transactions here', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: 'Hide balances', exact: true }).click();
+    assert.equal(await page.locator('.balance-number').innerText(), '••••••');
+    await page.getByRole('button', { name: 'Show balances', exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: '.impeccable/mobile.png', fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'mobile horizontal overflow');
+    await page.getByRole('button', { name: 'Budgets', exact: true }).click();
+    await page.screenshot({ path: '.impeccable/mobile-budgets.png', fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'budget horizontal overflow');
+    await page.goto('http://localhost:3010/sync');
+    await page.getByText('Not connected', { exact: true }).waitFor();
+    assert.deepEqual(errors, []);
+    console.log('PASS: budget create/edit/persistence, transaction creation/search, empty state, privacy toggle, mobile overflow, inbox route, runtime errors.');
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exit(1); });
