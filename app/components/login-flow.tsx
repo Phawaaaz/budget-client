@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff, Info, Mail } from "lucide-react";
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Info, Mail } from "lucide-react";
 import { authenticate } from "../lib/auth";
 import { initialAuthState, type AuthState, type AuthStep } from "../lib/auth-types";
 
@@ -142,6 +141,6 @@ export default function LoginFlow() {
 
       {step === "reset-sent" && <div className="signin-form"><button type="button" className="signin-primary" onClick={() => show("email")}>Back to sign in</button></div>}
     </div>
-    <p className="signin-foot"><span>Sign-in isn&apos;t connected yet.</span><Link className="signin-link" href="/">Explore with sample data <ArrowRight size={15} aria-hidden="true" /></Link></p>
+    <p className="signin-foot"><span>Password and code sign-in aren&apos;t connected yet - try Continue with Google.</span></p>
   </>;
 }

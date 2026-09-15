@@ -7,6 +7,7 @@ import { accountBalance, categories, categoryColors, categoryIcons, isFinanceDat
 import AdviceView from "./advice-view";
 import ProfileMenu from "./profile-menu";
 import { signOut } from "../lib/auth";
+import { ApiError, buildCategoryMaps, createBudget, createTransaction, deleteBudget as apiDeleteBudget, deleteTransaction as apiDeleteTransaction, fetchAccounts, fetchBudgets, fetchCategories, fetchSyncStatus, fetchTransactions, googleConnectUrl, runSync, toFinanceData, updateBudget as apiUpdateBudget, updateTransaction as apiUpdateTransaction, type SyncStatus } from "../lib/api";
 
 type View = "Overview" | "Transactions" | "Budgets" | "Advice" | "Accounts" | "Inbox";
 const nav = [{ name: "Overview", icon: LayoutDashboard }, { name: "Transactions", icon: ArrowLeftRight }, { name: "Budgets", icon: Target }, { name: "Advice", icon: Compass }, { name: "Accounts", icon: Landmark }, { name: "Inbox", icon: Mail }] as const;
@@ -66,12 +67,38 @@ export default function MoneyWorkspace({ initialView = "Overview" }: { initialVi
   const [today, setToday] = useState<string | null>(null);
   const [txType, setTxType] = useState<"in" | "out">("out");
   const [helpFocus, setHelpFocus] = useState<"top" | "shortcuts">("top");
+  const [mode, setMode] = useState<"loading" | "live" | "demo">("loading");
+  const [categoryMaps, setCategoryMaps] = useState<{ idByName: Record<Category, string>; nameById: Record<string, Category> }>({ idByName: {} as Record<Category, string>, nameById: {} });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function refreshSyncStatus() {
+    try { setSyncStatus(await fetchSyncStatus()); } catch { /* backend unreachable; leave status as-is */ }
+  }
 
   useEffect(() => {
-    // Hydrate browser-only persistence after the server-rendered sample snapshot.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    try { const saved = localStorage.getItem(storageKey); if (saved) { const parsed: unknown = JSON.parse(saved); if (isFinanceData(parsed)) setData(parsed); else setStorageError("Saved demo data could not be read. Showing the original sample."); } } catch { setStorageError("Local storage is unavailable. Changes will last for this visit only."); }
-    setToday(localDate()); setReady(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [backendCategories, backendAccounts, backendTransactions, backendBudgets] = await Promise.all([
+          fetchCategories(), fetchAccounts(), fetchTransactions(), fetchBudgets(),
+        ]);
+        if (cancelled) return;
+        setCategoryMaps(buildCategoryMaps(backendCategories));
+        setData(toFinanceData(backendAccounts, backendTransactions, backendBudgets));
+        setMode("live");
+        refreshSyncStatus();
+      } catch {
+        if (cancelled) return;
+        try { const saved = localStorage.getItem(storageKey); if (saved) { const parsed: unknown = JSON.parse(saved); if (isFinanceData(parsed)) setData(parsed); else setStorageError("Saved demo data could not be read. Showing the original sample."); } } catch { setStorageError("Local storage is unavailable. Changes will last for this visit only."); }
+        setStorageError((prev) => prev || "Could not reach the budget server. Showing sample data - your edits will only be saved in this browser.");
+        setMode("demo");
+      } finally {
+        if (!cancelled) { setToday(localDate()); setReady(true); }
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 3500); return () => clearTimeout(timer); }, [toast]);
   // Single-key shortcuts, ignored while typing, with a modifier held, or while a dialog or menu is open.
@@ -95,7 +122,7 @@ export default function MoneyWorkspace({ initialView = "Overview" }: { initialVi
   });
   function update(next: FinanceData, message: string) {
     setData(next);
-    try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { setStorageError("Could not save on this device. Your changes are available for this visit."); }
+    if (mode === "demo") { try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { setStorageError("Could not save on this device. Your changes are available for this visit."); } }
     setToast(message);
   }
   function go(next: View) { setView(next); setPage(1); setError(""); }
@@ -130,21 +157,68 @@ export default function MoneyWorkspace({ initialView = "Overview" }: { initialVi
     (e.currentTarget.children[next - 1] as HTMLElement | undefined)?.focus();
   }
 
-  function saveBudget(e: FormEvent<HTMLFormElement>) {
+  async function saveBudget(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const values = new FormData(e.currentTarget); const cat = values.get("category") as Category; const limit = Number(values.get("limit"));
     if (!categories.includes(cat) || cat === "Income") { setError("Every category already has a budget. Edit an existing budget instead."); return; }
     if (!Number.isFinite(limit) || limit <= 0) { setError("Enter a budget amount greater than zero."); return; }
     if (monthBudgets.some(b => b.category === cat && b.id !== editingBudget?.id)) { setError("This category already has a budget. Edit its existing budget instead."); return; }
-    const budget: Budget = { id: editingBudget?.id ?? crypto.randomUUID(), category: cat, limit, month };
-    update({ ...data, budgets: [...data.budgets.filter(b => b.id !== budget.id), budget] }, editingBudget ? "Budget updated" : "Budget created"); setModal(null);
+    if (mode === "live") {
+      try {
+        if (editingBudget && editingBudget.category === cat) {
+          const updated = await apiUpdateBudget(editingBudget.id, { limit });
+          update({ ...data, budgets: data.budgets.map(b => b.id === updated.id ? { id: updated.id, category: updated.category as Category, limit: updated.limit, month: updated.month } : b) }, "Budget updated");
+        } else {
+          if (editingBudget) await apiDeleteBudget(editingBudget.id);
+          const created = await createBudget({ categoryId: categoryMaps.idByName[cat], limit, month });
+          update({ ...data, budgets: [...data.budgets.filter(b => b.id !== editingBudget?.id), { id: created.id, category: created.category as Category, limit: created.limit, month: created.month }] }, editingBudget ? "Budget updated" : "Budget created");
+        }
+      } catch (err) { setError(err instanceof ApiError ? err.message : "Could not save this budget."); return; }
+    } else {
+      const budget: Budget = { id: editingBudget?.id ?? crypto.randomUUID(), category: cat, limit, month };
+      update({ ...data, budgets: [...data.budgets.filter(b => b.id !== budget.id), budget] }, editingBudget ? "Budget updated" : "Budget created");
+    }
+    setModal(null);
   }
-  function saveTransaction(e: FormEvent<HTMLFormElement>) {
+  async function saveTransaction(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const values = new FormData(e.currentTarget); const amount = Number(values.get("amount")); const merchant = String(values.get("merchant") ?? "").trim();
     if (!merchant || !Number.isFinite(amount) || amount <= 0) { setError("Add a name and an amount greater than zero."); return; }
-    const t: Transaction = { id: crypto.randomUUID(), merchant, amount, date: String(values.get("date")), type: values.get("type") as "in" | "out", accountId: String(values.get("account")), category: values.get("category") as Category, note: String(values.get("note") ?? ""), reviewed: true, source: "Manual" };
-    if (t.type === "in") t.category = "Income";
-    if (t.type === "out" && t.category === "Income") { setError("Choose a spending category for money out."); return; }
+    const date = String(values.get("date")); const type = values.get("type") as "in" | "out"; const accountId = String(values.get("account")); const note = String(values.get("note") ?? "");
+    let category = values.get("category") as Category;
+    if (type === "in") category = "Income";
+    if (type === "out" && category === "Income") { setError("Choose a spending category for money out."); return; }
+    if (mode === "live") {
+      try {
+        const created = await createTransaction({ accountId, categoryId: categoryMaps.idByName[category], merchant, amount, type, date, note, reviewed: true, source: "Manual" });
+        const t: Transaction = { id: created.id, merchant: created.merchant, note: created.note, amount: created.amount, type: created.type, date: created.date, category: created.category as Category, accountId: created.accountId, reviewed: created.reviewed, source: "Manual" };
+        update({ ...data, transactions: [t, ...data.transactions] }, "Transaction added"); setMonth(t.date.slice(0, 7)); setModal(null); setPage(1);
+      } catch (err) { setError(err instanceof ApiError ? err.message : "Could not add this transaction."); }
+      return;
+    }
+    const t: Transaction = { id: crypto.randomUUID(), merchant, amount, date, type, accountId, category, note, reviewed: true, source: "Manual" };
     update({ ...data, transactions: [t, ...data.transactions] }, "Transaction added"); setMonth(t.date.slice(0, 7)); setModal(null); setPage(1);
+  }
+  function connectGmail() {
+    window.open(googleConnectUrl(), "_blank", "noopener");
+    setConnecting(true);
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts += 1;
+      const status = await fetchSyncStatus().catch(() => null);
+      if (status?.connected) { setSyncStatus(status); setConnecting(false); clearInterval(poll); setToast("Gmail connected"); }
+      else if (attempts >= 40) { setConnecting(false); clearInterval(poll); }
+    }, 3000);
+  }
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      const result = await runSync();
+      const [backendTransactions, backendAccounts] = await Promise.all([fetchTransactions(), fetchAccounts()]);
+      const converted = toFinanceData(backendAccounts, backendTransactions, []);
+      setData(prev => ({ ...prev, accounts: converted.accounts, transactions: converted.transactions }));
+      await refreshSyncStatus();
+      setToast(result.created ? `Synced ${result.created} new transaction${result.created === 1 ? "" : "s"}` : "No new transactions found");
+    } catch (err) { setError(err instanceof ApiError ? err.message : "Sync failed."); }
+    finally { setSyncing(false); }
   }
   function exportCsv() {
     const escape = (value: unknown) => `"${String(value).replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`;
@@ -167,7 +241,7 @@ export default function MoneyWorkspace({ initialView = "Overview" }: { initialVi
     </aside>
 
     <div className="main-shell">
-      <header className="topbar"><div className="breadcrumb"><span>My workspace</span><ChevronRight size={13} /><strong>{view}</strong></div><div className="topbar-actions"><span className="sample-label">Sample data</span><IconButton label={hidden ? "Show balances" : "Hide balances"} onClick={() => setHidden(!hidden)}>{hidden ? <EyeOff /> : <Eye />}</IconButton><ProfileMenu variant="topbar" onAbout={() => openHelp("top")} onShortcuts={() => openHelp("shortcuts")} /></div></header>
+      <header className="topbar"><div className="breadcrumb"><span>My workspace</span><ChevronRight size={13} /><strong>{view}</strong></div><div className="topbar-actions">{mode !== "live" && <span className="sample-label">Sample data</span>}<IconButton label={hidden ? "Show balances" : "Hide balances"} onClick={() => setHidden(!hidden)}>{hidden ? <EyeOff /> : <Eye />}</IconButton><ProfileMenu variant="topbar" onAbout={() => openHelp("top")} onShortcuts={() => openHelp("shortcuts")} /></div></header>
       <main id="main">
         {storageError && <div className="notice" role="alert">{storageError}<IconButton label="Dismiss notice" onClick={() => setStorageError("")}><X /></IconButton></div>}
         <div className="page-heading"><div><h1>{view === "Overview" ? "Your money. In perspective." : view === "Budgets" ? "Give every naira a direction." : view === "Transactions" ? "The everyday, accounted for." : view === "Accounts" ? "All your money, together." : view === "Advice" ? "The long view." : "From inbox to insight."}</h1><p>{view === "Overview" ? "Good to see you, Fawaz. Here's where things stand." : view === "Budgets" ? "Make space for the essentials. And the things you love." : view === "Transactions" ? "A clear view of what came in and what went out." : view === "Accounts" ? "Your balances across the whole picture." : view === "Advice" ? "Patterns across your recent months, with general guidance on what to do about them. General information, not financial advice." : "Review the details behind your money."}</p></div>{view !== "Advice" && <button className="button primary" onClick={() => { if (view === "Budgets") openBudget(); else { setError(""); setTxType("out"); setModal("transaction"); } }} disabled={!ready}><Plus size={17} />{view === "Budgets" ? "Create budget" : "Add transaction"}</button>}</div>
@@ -190,26 +264,26 @@ export default function MoneyWorkspace({ initialView = "Overview" }: { initialVi
 
         {view === "Budgets" && <><section className="budget-banner"><div><span>Your monthly plan</span><strong>{displayMoney(budgetLimit)}</strong></div><div><span>Spent in budgeted categories</span><strong>{displayMoney(budgetSpent)}</strong></div><div><span>{budgetSpent > budgetLimit ? "Over budget" : "Still available"}</span><strong>{displayMoney(Math.abs(budgetLimit - budgetSpent))}</strong></div></section><div className="budget-grid">{monthBudgets.map(b => { const spent = monthAll.filter(t => t.type === "out" && t.category === b.category).reduce((s, t) => s + t.amount, 0); const percent = Math.round(spent / b.limit * 100); const Icon = categoryIcons[b.category]; return <article className="budget-card" key={b.id}><div className="section-heading"><span className="category-symbol" style={{ background: categoryColors[b.category] }}><Icon size={20} /></span><IconButton label={`Edit ${b.category} budget`} onClick={() => openBudget(b)}><Pencil /></IconButton></div><h2>{b.category}</h2><div className="budget-value"><strong>{displayMoney(spent)}</strong><span> / {displayMoney(b.limit)}</span></div><div className="progress-track" role="progressbar" aria-label={`${b.category} budget used`} aria-valuenow={Math.min(percent, 100)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${percent}% used`}><span style={{ width: `${Math.min(percent, 100)}%`, background: percent > 100 ? "var(--negative)" : categoryColors[b.category] }} /></div><div className="budget-status"><span className={percent > 100 ? "negative" : percent >= 90 ? "warning" : ""}>{percent > 100 ? "Over budget" : percent >= 90 ? "Getting close" : "On track"}</span><strong>{displayMoney(Math.abs(b.limit - spent))} {spent > b.limit ? "over" : "left"}</strong></div></article>; })}{monthBudgets.length < categories.length - 1 && <button className="new-budget" onClick={() => openBudget()}><Plus size={28} /><strong>Create a budget</strong><span>Make room for something new</span></button>}</div><p className="budget-footnote">Spending outside your budgets: <strong>{displayMoney(totals(monthAll).spending - budgetSpent)}</strong></p></>}
 
-        {view === "Accounts" && <><section className="account-total"><span>Total balance · all time</span><strong>{displayMoney(totalBalance)}</strong><p>Opening balances plus all recorded money in and out.</p></section><div className="account-grid">{data.accounts.filter(a => account === "all" || a.id === account).map(a => <article className="account-card" key={a.id}><div className="section-heading"><span className="bank-mark" style={{ background: a.color }}><Landmark /></span><span className="sample-label">Sample account</span></div><h2>{a.name}</h2><p>{a.kind}</p><strong>{displayMoney(accountBalance(data, a.id))}</strong><div className="account-movement"><span>In this month<b className="positive">{displayMoney(totals(monthTransactions(data, month, a.id)).income)}</b></span><span>Out this month<b>{displayMoney(totals(monthTransactions(data, month, a.id)).spending)}</b></span></div><button className="text-button" onClick={() => { setAccount(a.id); setCategory("all"); go("Transactions"); }}>View transactions <ArrowRight size={16} /></button></article>)}</div></>}
+        {view === "Accounts" && <><section className="account-total"><span>Total balance · all time</span><strong>{displayMoney(totalBalance)}</strong><p>Opening balances plus all recorded money in and out.</p></section><div className="account-grid">{data.accounts.filter(a => account === "all" || a.id === account).map(a => <article className="account-card" key={a.id}><div className="section-heading"><span className="bank-mark" style={{ background: a.color }}><Landmark /></span>{mode !== "live" && <span className="sample-label">Sample account</span>}</div><h2>{a.name}</h2><p>{a.kind}</p><strong>{displayMoney(accountBalance(data, a.id))}</strong><div className="account-movement"><span>In this month<b className="positive">{displayMoney(totals(monthTransactions(data, month, a.id)).income)}</b></span><span>Out this month<b>{displayMoney(totals(monthTransactions(data, month, a.id)).spending)}</b></span></div><button className="text-button" onClick={() => { setAccount(a.id); setCategory("all"); go("Transactions"); }}>View transactions <ArrowRight size={16} /></button></article>)}</div></>}
 
         {view === "Advice" && <AdviceView data={data} month={month} range={range} today={today} hidden={hidden} money={displayMoney} go={goFromAdvice} />}
 
-        {view === "Inbox" && <><section className="connection-section"><div className="connection-art"><Mail size={36} /><span><Link2 size={19} /></span></div><div><h2>Your inbox, connected to the bigger picture.</h2><p>Email connection is not set up. Your workspace currently uses sample transactions.</p><span className="connection-status"><i /> Not connected</span></div></section><section className="review-section"><div className="section-heading"><h2>Needs a second look</h2><span>{needReview} to review</span></div>{data.transactions.filter(t => !t.reviewed).map(t => <button key={t.id} className="review-row" onClick={() => setSelected(t)}><Mail size={20} /><span><strong>{t.merchant}</strong><small>{t.note} · {new Date(`${t.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} · {t.source}</small></span><strong className={t.type === "in" ? "positive" : undefined}>{hidden ? "••••••" : `${t.type === "in" ? "+" : "−"}${money(t.amount)}`}</strong><ArrowRight size={18} /></button>)}{!needReview && <div className="empty"><Check /><h3>All caught up.</h3><p>Every transaction has been reviewed.</p></div>}</section></>}
+        {view === "Inbox" && <><section className="connection-section"><div className="connection-art"><Mail size={36} /><span><Link2 size={19} /></span></div><div><h2>Your inbox, connected to the bigger picture.</h2>{mode !== "live" ? <><p>Email connection is not available. Your workspace currently uses sample transactions.</p><span className="connection-status"><i /> Not connected</span></> : syncStatus?.connected ? <><p>Connected to {syncStatus.email}. {syncStatus.lastSyncedAt ? `Last synced ${new Date(syncStatus.lastSyncedAt).toLocaleString()}.` : "Not synced yet."}</p><span className="connection-status"><i style={{ background: "#358760" }} /> Connected</span><div className="form-actions"><button className="button primary" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync now"}</button></div></> : <><p>{connecting ? "Waiting for you to finish connecting in the new tab..." : "Connect your Gmail account to start importing transactions from bank and payment alerts."}</p><span className="connection-status"><i /> Not connected</span><div className="form-actions"><button className="button primary" disabled={connecting} onClick={connectGmail}>{connecting ? "Waiting..." : "Connect Gmail"}</button></div></>}</div></section><section className="review-section"><div className="section-heading"><h2>Needs a second look</h2><span>{needReview} to review</span></div>{data.transactions.filter(t => !t.reviewed).map(t => <button key={t.id} className="review-row" onClick={() => setSelected(t)}><Mail size={20} /><span><strong>{t.merchant}</strong><small>{t.note} · {new Date(`${t.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} · {t.source}</small></span><strong className={t.type === "in" ? "positive" : undefined}>{hidden ? "••••••" : `${t.type === "in" ? "+" : "−"}${money(t.amount)}`}</strong><ArrowRight size={18} /></button>)}{!needReview && <div className="empty"><Check /><h3>All caught up.</h3><p>Every transaction has been reviewed.</p></div>}</section></>}
         <footer className="page-footer"><span>Made for your everyday.</span><span>Folio · Personal finance <span className="footer-dot">/</span> Sample workspace</span></footer>
       </main>
     </div>
     <div role="status" aria-live="polite">{toast && <div className="toast"><Check size={17} />{toast}</div>}</div>
 
-    {modal === "budget" && <Dialog title={editingBudget ? "Edit your budget" : "Make a little room."} close={() => setModal(null)}><p className="dialog-subtitle">{monthLabel(month)} · all accounts</p><form onSubmit={saveBudget}><label>Category<select name="category" defaultValue={editingBudget?.category ?? categories.filter(c => c !== "Income" && !monthBudgets.some(b => b.category === c))[0]}>{categories.filter(c => c !== "Income").map(c => <option key={c} disabled={monthBudgets.some(b => b.category === c && b.id !== editingBudget?.id)}>{c}</option>)}</select></label><label>Monthly limit (NGN)<input name="limit" type="number" min="1" max="100000000000" step="0.01" required placeholder="50,000" defaultValue={editingBudget?.limit} autoFocus /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions">{editingBudget && <button type="button" className="button danger" onClick={() => { update({ ...data, budgets: data.budgets.filter(b => b.id !== editingBudget.id) }, "Budget deleted"); setModal(null); }}><Trash2 size={16} /> Delete</button>}<button className="button primary" type="submit">{editingBudget ? "Save budget" : "Create budget"}<ArrowRight size={16} /></button></div></form></Dialog>}
+    {modal === "budget" && <Dialog title={editingBudget ? "Edit your budget" : "Make a little room."} close={() => setModal(null)}><p className="dialog-subtitle">{monthLabel(month)} · all accounts</p><form onSubmit={saveBudget}><label>Category<select name="category" defaultValue={editingBudget?.category ?? categories.filter(c => c !== "Income" && !monthBudgets.some(b => b.category === c))[0]}>{categories.filter(c => c !== "Income").map(c => <option key={c} disabled={monthBudgets.some(b => b.category === c && b.id !== editingBudget?.id)}>{c}</option>)}</select></label><label>Monthly limit (NGN)<input name="limit" type="number" min="1" max="100000000000" step="0.01" required placeholder="50,000" defaultValue={editingBudget?.limit} autoFocus /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions">{editingBudget && <button type="button" className="button danger" onClick={async () => { if (mode === "live") { try { await apiDeleteBudget(editingBudget.id); } catch (err) { setError(err instanceof ApiError ? err.message : "Could not delete this budget."); return; } } update({ ...data, budgets: data.budgets.filter(b => b.id !== editingBudget.id) }, "Budget deleted"); setModal(null); }}><Trash2 size={16} /> Delete</button>}<button className="button primary" type="submit">{editingBudget ? "Save budget" : "Create budget"}<ArrowRight size={16} /></button></div></form></Dialog>}
     {modal === "transaction" && <Dialog title="Add a transaction" close={() => setModal(null)}><form onSubmit={saveTransaction}><div className="form-columns"><label>Money<select name="type" value={txType} onChange={e => setTxType(e.target.value as "in" | "out")}><option value="out">Money out</option><option value="in">Money in</option></select></label><label>Amount (NGN)<input name="amount" type="number" min="0.01" step="0.01" max="100000000000" required placeholder="0.00" /></label></div><label>Name<input name="merchant" required maxLength={100} placeholder="Who was it to or from?" /></label><div className="form-columns"><label>Date<input name="date" type="date" required defaultValue={`${month}-06`} /></label><label>Account<select name="account" defaultValue={account === "all" ? data.accounts[0].id : account}>{data.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label></div><label>Category<select name="category" key={txType}>{categories.filter(c => (txType === "in") === (c === "Income")).map(c => <option key={c}>{c}</option>)}</select></label><label>Note <span className="muted">(optional)</span><input name="note" maxLength={160} placeholder="A little context for later" /></label>{error && <p role="alert" className="form-error">{error}</p>}<div className="form-actions"><button className="button primary" type="submit">Add transaction <Plus size={16} /></button></div></form></Dialog>}
-    {selected && <Dialog title="Transaction details" close={() => setSelected(null)}><div className="detail-heading"><span className="merchant-icon" style={{ "--category": categoryColors[selected.category] } as CSSProperties}>{selected.type === "in" ? <ArrowDownLeft /> : <ArrowUpRight />}</span><h3>{selected.merchant}</h3><strong className={selected.type === "in" ? "positive" : ""}>{displayMoney(selected.amount)}</strong><p>{selected.note}</p></div><dl className="detail-list"><div><dt>Date</dt><dd>{new Date(`${selected.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</dd></div><div><dt>Account</dt><dd>{data.accounts.find(a => a.id === selected.accountId)?.name}</dd></div><div><dt>Source</dt><dd>{selected.source}</dd></div><div><dt>Status</dt><dd>{selected.reviewed ? "Reviewed" : "Needs review"}</dd></div></dl><label className="detail-category">Category<select value={selected.category} onChange={e => { const changed = { ...selected, category: e.target.value as Category }; update({ ...data, transactions: data.transactions.map(t => t.id === changed.id ? changed : t) }, "Category updated"); setSelected(changed); }}>{categories.filter(c => (selected.type === "in") === (c === "Income")).map(c => <option key={c}>{c}</option>)}</select></label><div className="form-actions"><button className="button danger" onClick={() => { update({ ...data, transactions: data.transactions.filter(t => t.id !== selected.id) }, "Transaction deleted"); setSelected(null); }}><Trash2 size={16} />Delete</button><button className="button primary" disabled={selected.reviewed} onClick={() => { const changed = { ...selected, reviewed: true }; update({ ...data, transactions: data.transactions.map(t => t.id === selected.id ? changed : t) }, "Transaction reviewed"); setSelected(changed); }}><Check size={16} />{selected.reviewed ? "Reviewed" : "Mark reviewed"}</button></div></Dialog>}
+    {selected && <Dialog title="Transaction details" close={() => setSelected(null)}><div className="detail-heading"><span className="merchant-icon" style={{ "--category": categoryColors[selected.category] } as CSSProperties}>{selected.type === "in" ? <ArrowDownLeft /> : <ArrowUpRight />}</span><h3>{selected.merchant}</h3><strong className={selected.type === "in" ? "positive" : ""}>{displayMoney(selected.amount)}</strong><p>{selected.note}</p></div><dl className="detail-list"><div><dt>Date</dt><dd>{new Date(`${selected.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</dd></div><div><dt>Account</dt><dd>{data.accounts.find(a => a.id === selected.accountId)?.name}</dd></div><div><dt>Source</dt><dd>{selected.source}</dd></div><div><dt>Status</dt><dd>{selected.reviewed ? "Reviewed" : "Needs review"}</dd></div></dl><label className="detail-category">Category<select value={selected.category} onChange={async e => { const nextCategory = e.target.value as Category; const changed = { ...selected, category: nextCategory }; if (mode === "live") { try { await apiUpdateTransaction(selected.id, { categoryId: categoryMaps.idByName[nextCategory] }); } catch (err) { setError(err instanceof ApiError ? err.message : "Could not update this category."); return; } } update({ ...data, transactions: data.transactions.map(t => t.id === changed.id ? changed : t) }, "Category updated"); setSelected(changed); }}>{categories.filter(c => (selected.type === "in") === (c === "Income")).map(c => <option key={c}>{c}</option>)}</select></label><div className="form-actions"><button className="button danger" onClick={async () => { if (mode === "live") { try { await apiDeleteTransaction(selected.id); } catch (err) { setError(err instanceof ApiError ? err.message : "Could not delete this transaction."); return; } } update({ ...data, transactions: data.transactions.filter(t => t.id !== selected.id) }, "Transaction deleted"); setSelected(null); }}><Trash2 size={16} />Delete</button><button className="button primary" disabled={selected.reviewed} onClick={async () => { const changed = { ...selected, reviewed: true }; if (mode === "live") { try { await apiUpdateTransaction(selected.id, { reviewed: true }); } catch (err) { setError(err instanceof ApiError ? err.message : "Could not update this transaction."); return; } } update({ ...data, transactions: data.transactions.map(t => t.id === selected.id ? changed : t) }, "Transaction reviewed"); setSelected(changed); }}><Check size={16} />{selected.reviewed ? "Reviewed" : "Mark reviewed"}</button></div></Dialog>}
     {modal === "help" && <Dialog title="About this workspace" close={() => setModal(null)} focusId={helpFocus === "shortcuts" ? "shortcuts-title" : undefined}>
-      <div className="about-id"><span className="avatar" aria-hidden="true">F</span><span><strong>Fawaz</strong><small>Personal workspace</small></span><span className="sample-label">Sample data</span></div>
+      <div className="about-id"><span className="avatar" aria-hidden="true">F</span><span><strong>Fawaz</strong><small>Personal workspace</small></span>{mode !== "live" && <span className="sample-label">Sample data</span>}</div>
       <dl className="about-list">
         <div><dt>Name</dt><dd>Folio <span className="muted">(working name)</span></dd></div>
         <div><dt>Currency</dt><dd>Nigerian naira (NGN)</dd></div>
-        <div><dt>Data</dt><dd>Illustrative sample. Edits are saved only in this browser.</dd></div>
-        <div><dt>Connections</dt><dd>No bank or email account is connected.</dd></div>
+        <div><dt>Data</dt><dd>{mode === "live" ? "Connected to your budget server. Balances and transactions are real." : "Illustrative sample. Edits are saved only in this browser."}</dd></div>
+        <div><dt>Connections</dt><dd>{mode === "live" ? (syncStatus?.connected ? `Gmail connected as ${syncStatus.email}.` : "Gmail not connected yet - use the Inbox tab.") : "No bank or email account is connected."}</dd></div>
       </dl>
       <section className="about-shortcuts" aria-labelledby="shortcuts-title">
         <h3 id="shortcuts-title" tabIndex={-1}>Keyboard shortcuts</h3>

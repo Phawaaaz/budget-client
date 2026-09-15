@@ -1,10 +1,13 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { AuthState, AuthStep } from "./auth-types";
+import { SESSION_COOKIE } from "./session";
 
 export async function signOut() {
-  // TODO(backend): end the session before leaving.
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
   redirect("/login");
 }
 
@@ -58,8 +61,7 @@ export async function authenticate(_previous: AuthState, formData: FormData): Pr
       return { status: "preview", from, next: "reset-sent", email, message: `Preview: no email was sent. Once sign-in is connected, a reset link goes to ${email} if there's an account for it.` };
 
     case "google":
-      // TODO(backend): start the Google OAuth redirect.
-      return { status: "not-connected", from, email, message: "Google sign-in isn't connected yet. It needs Google OAuth on your backend." };
+      redirect("/api/auth/google/start");
 
     default:
       return { status: "error", from, email, message: "That didn't work. Try again." };

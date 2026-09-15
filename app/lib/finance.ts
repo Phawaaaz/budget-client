@@ -1,7 +1,7 @@
 import { ArrowDownLeft, Car, Circle, Music, ShoppingBag, Utensils, Zap } from "lucide-react";
 
 export type Category = "Food & groceries" | "Shopping" | "Transport" | "Bills & subscriptions" | "Lifestyle" | "Income" | "Other";
-export type Transaction = { id: string; merchant: string; note: string; amount: number; type: "in" | "out"; date: string; category: Category; accountId: string; reviewed: boolean; source: "Sample email" | "Manual" };
+export type Transaction = { id: string; merchant: string; note: string; amount: number; type: "in" | "out"; date: string; category: Category; accountId: string; reviewed: boolean; source: "Sample email" | "Manual" | "Email" };
 export type Account = { id: string; name: string; kind: string; openingBalance: number; color: string };
 export type Budget = { id: string; category: Category; limit: number; month: string };
 export type FinanceData = { version: 1; accounts: Account[]; transactions: Transaction[]; budgets: Budget[] };
@@ -119,7 +119,7 @@ export function isFinanceData(value: unknown): value is FinanceData {
     && Array.isArray(d.accounts) && d.accounts.length > 0
     && d.accounts.every(a => a && typeof a.id === "string" && typeof a.name === "string" && typeof a.kind === "string" && typeof a.color === "string" && Number.isFinite(a.openingBalance))
     && Array.isArray(d.transactions)
-    && d.transactions.every(t => t && typeof t.id === "string" && typeof t.merchant === "string" && typeof t.note === "string" && typeof t.reviewed === "boolean" && ["Sample email", "Manual"].includes(t.source) && typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount > 0 && ["in", "out"].includes(t.type) && categories.includes(t.category) && d.accounts.some(a => a.id === t.accountId))
+    && d.transactions.every(t => t && typeof t.id === "string" && typeof t.merchant === "string" && typeof t.note === "string" && typeof t.reviewed === "boolean" && ["Sample email", "Manual", "Email"].includes(t.source) && typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount > 0 && ["in", "out"].includes(t.type) && categories.includes(t.category) && d.accounts.some(a => a.id === t.accountId))
     && Array.isArray(d.budgets)
     && d.budgets.every(b => b && typeof b.id === "string" && categories.includes(b.category) && b.category !== "Income" && Number.isFinite(b.limit) && b.limit > 0 && /^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))
     && new Set(d.budgets.map(b => `${b.month}:${b.category}`)).size === d.budgets.length;
